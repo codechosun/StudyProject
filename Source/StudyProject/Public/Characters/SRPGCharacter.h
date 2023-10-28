@@ -13,6 +13,8 @@ class STUDYPROJECT_API ASRPGCharacter : public ASCharacter
 {
     GENERATED_BODY()
 
+    friend class UAN_CheckHit;
+
 public:
     ASRPGCharacter();
 
@@ -24,6 +26,8 @@ public:
 
     UFUNCTION()
     void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+    virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -69,5 +73,9 @@ private:
 
     bool bIsAttackKeyPressed = false;
     // 에디터에서 관리되거나 시리얼라이즈 될 필요 없으므로 그냥 bool 자료형 사용.
+
+    float AttackRange = 200.f;
+
+    float AttackRadius = 50.f;
 
 };
