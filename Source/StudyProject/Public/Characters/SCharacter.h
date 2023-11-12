@@ -14,15 +14,14 @@ class STUDYPROJECT_API ASCharacter : public ACharacter
 public:
     ASCharacter();
 
-    float GetMaxHP() const { return MaxHP; }
+    virtual void BeginPlay() override;
 
-    float GetCurrentHP() const { return CurrentHP; }
+    virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
-    void SetMaxHP(float InMaxHP) { MaxHP = InMaxHP; }
+    class USStatComponent* GetStatComponent() { return StatComponent; }
 
-    void SetCurrentHP(float InCurrentHP) { CurrentHP = InCurrentHP; }
-
-    bool IsDead() const { return bIsDead; }
+    UFUNCTION()
+    virtual void OnCharacterDeath();
 
 protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ASTPSCharacter", meta = (AllowPrivateAccess))
@@ -31,13 +30,7 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ASTPSCharacter", meta = (AllowPrivateAccess))
     TObjectPtr<class UCameraComponent> CameraComponent;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ASRPGCharacter", Meta = (AllowPrivateAccess))
-    float MaxHP = 200.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ASRPGCharacter", Meta = (AllowPrivateAccess))
-    float CurrentHP = 200.f;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ASRPGCharacter", Meta = (AllowPrivateAccess))
-    uint8 bIsDead : 1;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = ASPlayerCharacter, Meta = (AllowPrivateAccess))
+    TObjectPtr<class USStatComponent> StatComponent;
 
 };
