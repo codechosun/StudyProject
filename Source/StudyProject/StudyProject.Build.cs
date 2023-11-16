@@ -24,7 +24,11 @@ public class StudyProject : ModuleRules
 			"GameplayTasks",
 			 });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{ 
+            // Custom Modules
+            "StudyProjectSettings",
+		});
 
 	}
 }

@@ -17,6 +17,9 @@
 #include "Engine/DamageEvents.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Game/SPlayerState.h"
+#include "SPlayerCharacterSettings.h"
+#include "Game/SGameInstance.h"
+#include "Engine/StreamableManager.h"
 
 ASRPGCharacter::ASRPGCharacter()
     : bIsAttacking(false)
@@ -44,6 +47,15 @@ ASRPGCharacter::ASRPGCharacter()
     ParticleSystemComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("ParticleSystemComponent"));
     ParticleSystemComponent->SetupAttachment(GetRootComponent());
     ParticleSystemComponent->SetAutoActivate(false);
+
+    const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
+    if (0 < CDO->PlayerCharacterMeshPaths.Num())
+    {
+        for (FSoftObjectPath PlayerCharacterMeshPath : CDO->PlayerCharacterMeshPaths)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Path: %s"), *(PlayerCharacterMeshPath.ToString()));
+        }
+    }
 }
 
 void ASRPGCharacter::BeginPlay()
@@ -75,6 +87,19 @@ void ASRPGCharacter::BeginPlay()
         {
             PS->OnCurrentLevelChangedDelegate.AddDynamic(this, &ThisClass::OnCurrentLevelChanged);
         }
+    }
+
+    const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
+    int32 RandIndex = FMath::RandRange(0, CDO->PlayerCharacterMeshPaths.Num() - 1);
+    CurrentPlayerCharacterMeshPath = CDO->PlayerCharacterMeshPaths[RandIndex];
+
+    USGameInstance* SGI = Cast<USGameInstance>(GetGameInstance());
+    if (true == ::IsValid(SGI))
+    {
+        AssetStreamableHandle = SGI->StreamableManager.RequestAsyncLoad(
+            CurrentPlayerCharacterMeshPath,
+            FStreamableDelegate::CreateUObject(this, &ThisClass::OnAssetLoaded)
+        );
     }
 }
 
@@ -238,4 +263,14 @@ void ASRPGCharacter::EndCombo(UAnimMontage* InAnimMontage, bool bInterrupted)
 void ASRPGCharacter::OnCurrentLevelChanged(int32 InOldCurrentLevel, int32 InNewCurrentLevel)
 {
     ParticleSystemComponent->Activate(true);
+}
+
+void ASRPGCharacter::OnAssetLoaded()
+{
+    AssetStreamableHandle->ReleaseHandle();
+    TSoftObjectPtr<USkeletalMesh> LoadedAsset(CurrentPlayerCharacterMeshPath);
+    if (true == LoadedAsset.IsValid())
+    {
+        GetMesh()->SetSkeletalMesh(LoadedAsset.Get());
+    }
 }
