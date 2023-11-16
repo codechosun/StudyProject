@@ -28,6 +28,10 @@ public:
 
     void SetCurrentHP(float InCurrentHP);
 
+private:
+    UFUNCTION()
+    void OnCurrentLevelChanged(int32 InOldCurrentLevel, int32 InNewCurrentLevel);
+
 public:
     FOnOutOfCurrentHPDelegate OnOutOfCurrentHPDelegate;
 
