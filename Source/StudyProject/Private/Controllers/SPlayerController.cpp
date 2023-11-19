@@ -12,6 +12,33 @@ ASPlayerController::ASPlayerController()
     PrimaryActorTick.bCanEverTick = true;
 }
 
+void ASPlayerController::ToggleMenu()
+{
+    if (false == bIsMenuOn)
+    {
+        MenuUIInstance->SetVisibility(ESlateVisibility::Visible);
+
+        FInputModeUIOnly Mode;
+        Mode.SetWidgetToFocus(MenuUIInstance->GetCachedWidget());
+        SetInputMode(Mode);
+
+        // SetPause(true); 만약 게임 일시 정지를 원한다면.
+        bShowMouseCursor = true;
+    }
+    else
+    {
+        MenuUIInstance->SetVisibility(ESlateVisibility::Collapsed);
+
+        FInputModeGameOnly InputModeGameOnly;
+        SetInputMode(InputModeGameOnly);
+
+        // SetPause(false); 만약 게임 일시 정지를 원한다면.
+        bShowMouseCursor = false;
+    }
+
+    bIsMenuOn = !bIsMenuOn;
+}
+
 void ASPlayerController::BeginPlay()
 {
     Super::BeginPlay();
@@ -41,6 +68,17 @@ void ASPlayerController::BeginPlay()
                     HUDWidget->BindStatComponent(StatComponent);
                 }
             }
+        }
+    }
+
+    if (true == ::IsValid(MenuUIClass))
+    {
+        MenuUIInstance = CreateWidget<UUserWidget>(this, MenuUIClass);
+        if (true == ::IsValid(MenuUIInstance))
+        {
+            MenuUIInstance->AddToViewport(3); // 상위에 띄움.
+
+            MenuUIInstance->SetVisibility(ESlateVisibility::Collapsed);
         }
     }
 }

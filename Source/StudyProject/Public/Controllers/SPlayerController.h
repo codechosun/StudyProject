@@ -19,8 +19,19 @@ public:
 
     class USHUD* GetHUDWidget() const { return HUDWidget; };
 
+    void ToggleMenu();
+
 protected:
     virtual void BeginPlay() override;
+
+protected:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = ASPlayerController, Meta = (AllowPrivateAccess))
+    TSubclassOf<class UUserWidget> MenuUIClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = ASPlayerController, Meta = (AllowPrivateAccess))
+    TObjectPtr<class UUserWidget> MenuUIInstance;
+
+    bool bIsMenuOn = false;
 
 private:
     UPROPERTY();

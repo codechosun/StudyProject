@@ -20,6 +20,7 @@
 #include "SPlayerCharacterSettings.h"
 #include "Game/SGameInstance.h"
 #include "Engine/StreamableManager.h"
+#include "Controllers/SPlayerController.h"
 
 ASRPGCharacter::ASRPGCharacter()
     : bIsAttacking(false)
@@ -126,6 +127,7 @@ void ASRPGCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
         EnhancedInputComponent->BindAction(PlayerCharacterInputConfigData->LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
         EnhancedInputComponent->BindAction(PlayerCharacterInputConfigData->JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
         EnhancedInputComponent->BindAction(PlayerCharacterInputConfigData->AttackAction, ETriggerEvent::Started, this, &ThisClass::Attack);
+        EnhancedInputComponent->BindAction(PlayerCharacterInputConfigData->MenuAction, ETriggerEvent::Started, this, &ThisClass::Menu);
     }
 }
 
@@ -271,5 +273,14 @@ void ASRPGCharacter::OnAssetLoaded()
     if (true == LoadedAsset.IsValid())
     {
         GetMesh()->SetSkeletalMesh(LoadedAsset.Get());
+    }
+}
+
+void ASRPGCharacter::Menu(const FInputActionValue& InValue)
+{
+    ASPlayerController* PlayerController = GetController<ASPlayerController>();
+    if (true == ::IsValid(PlayerController))
+    {
+        PlayerController->ToggleMenu();
     }
 }
