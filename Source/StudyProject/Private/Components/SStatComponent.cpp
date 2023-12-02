@@ -28,7 +28,7 @@ void USStatComponent::BeginPlay()
         }
     }
 
-    ASRPGCharacter* OwnerPlayerCharacter = Cast<ASRPGCharacter>(GetOwner());
+    ASCharacter* OwnerPlayerCharacter = Cast<ASCharacter>(GetOwner());
     if (true == ::IsValid(OwnerPlayerCharacter))
     {
         ASPlayerState* PS = Cast<ASPlayerState>(OwnerPlayerCharacter->GetPlayerState());

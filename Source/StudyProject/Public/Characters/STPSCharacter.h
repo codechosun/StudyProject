@@ -51,6 +51,11 @@ private:
 
     void StopFire(const FInputActionValue& InValue);
 
+    void SpawnLandMine(const FInputActionValue& InValue);
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void SpawnLandMine_Server();
+
 private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ASTPSCharacter", meta = (AllowPrivateAccess))
     TObjectPtr<USkeletalMeshComponent> WeaponSkeletalMeshComponent;
@@ -89,5 +94,8 @@ private:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = ASPlayerCharacter, Meta = (AllowPrivateAccess = true))
     TSubclassOf<class UCameraShakeBase> FireShake;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = ASPlayerCharacter, Meta = (AllowPrivateAccess = true))
+    TSubclassOf<class AActor> LandMineClass;
 
 };

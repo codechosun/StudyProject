@@ -63,7 +63,7 @@ float ASNonPlayerCharacter::TakeDamage(float Damage, FDamageEvent const& DamageE
 
         if (true == ::IsValid(LastHitBy))
         {
-            ASRPGCharacter* DamageCauserCharacter = Cast<ASRPGCharacter>(LastHitBy->GetPawn());
+            ASCharacter* DamageCauserCharacter = Cast<ASCharacter>(LastHitBy->GetPawn());
             if (true == ::IsValid(DamageCauserCharacter))
             {
                 ASPlayerState* PS = Cast<ASPlayerState>(DamageCauserCharacter->GetPlayerState());
@@ -135,7 +135,7 @@ void ASNonPlayerCharacter::Attack()
         {
             //UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("[NPC] Hit Actor Name: %s"), *HitResult.GetActor()->GetName()));
 
-            ASRPGCharacter* PlayerCharacter = Cast<ASRPGCharacter>(HitResult.GetActor());
+            ASCharacter* PlayerCharacter = Cast<ASCharacter>(HitResult.GetActor());
             if (true == ::IsValid(PlayerCharacter))
             {
                 PlayerCharacter->TakeDamage(10.f, FDamageEvent(), GetController(), this);

@@ -59,7 +59,7 @@ void ASPlayerController::BeginPlay()
                 HUDWidget->BindPlayerState(SPlayerState);
             }
 
-            ASRPGCharacter* PC = GetPawn<ASRPGCharacter>();
+            ASCharacter* PC = GetPawn<ASCharacter>();
             if (true == ::IsValid(PC))
             {
                 USStatComponent* StatComponent = PC->GetStatComponent();
