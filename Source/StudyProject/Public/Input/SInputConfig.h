@@ -1,0 +1,29 @@
+// SInputConfig.h
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/DataAsset.h"
+#include "SInputConfig.generated.h"
+
+class UInputAction;
+
+/**
+ *
+ */
+UCLASS()
+class STUDYPROJECT_API USInputConfig : public UDataAsset
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> Move;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> Look;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UInputAction> ChangeView;
+
+};
