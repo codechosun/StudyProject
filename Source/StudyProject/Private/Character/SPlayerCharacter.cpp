@@ -9,6 +9,8 @@
 #include "Input/SInputConfig.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Item/SWeaponActor.h"
+#include "Animation/SAnimInstance.h"
 
 ASPlayerCharacter::ASPlayerCharacter()
 {
@@ -34,6 +36,14 @@ void ASPlayerCharacter::BeginPlay()
 		{
 			Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 0);
 		}
+	}
+
+	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+	if (IsValid(AnimInstance) == true)
+	{
+		AnimInstance->OnMontageEnded.AddDynamic(this, &ThisClass::OnMeleeAttackMontageEnded);
+		AnimInstance->OnCheckHit.AddDynamic(this, &ThisClass::OnCheckHit);
+		AnimInstance->OnCheckAttackInput.AddDynamic(this, &ThisClass::OnCheckAttackInput);
 	}
 }
 
@@ -153,6 +163,21 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 	}
 }
 
+void ASPlayerCharacter::OnMeleeAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage->GetName().Equals(TEXT("AM_Rifle_Fire_Melee"), ESearchCase::IgnoreCase) == true)
+	{
+		GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+		bIsNowAttacking = false;
+	}
+}
+
+void ASPlayerCharacter::OnCheckHit()
+{
+	UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("CheckHit() has been called.")));
+	// 다음 단원에서 Collision에 대해 배움.
+}
+
 void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -163,6 +188,10 @@ void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Move, ETriggerEvent::Triggered, this, &ThisClass::InputMove);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Look, ETriggerEvent::Triggered, this, &ThisClass::InputLook);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->ChangeView, ETriggerEvent::Started, this, &ThisClass::InputChangeView);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Jump, ETriggerEvent::Started, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->QuickSlot01, ETriggerEvent::Started, this, &ThisClass::InputQuickSlot01);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->QuickSlot02, ETriggerEvent::Started, this, &ThisClass::InputQuickSlot02);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Attack, ETriggerEvent::Started, this, &ThisClass::InputAttack);
 	}
 }
 
@@ -246,7 +275,7 @@ void ASPlayerCharacter::InputChangeView(const FInputActionValue& InValue)
 		QuarterView는 컨트롤 로테이션에 폰 로테이션이 동기화 됨.
 		BackView는 컨트롤 로테이션이 스프링암 로테이션에 동기화 되고 있음.
 		따라서 시점 변경 전에 컨트롤 로테이션에 스프링암 로테이션을 세팅해둬야 함.
-
+		ss
 		*/
 		GetController()->SetControlRotation(SpringArmComponent->GetRelativeRotation());
 		DestArmLength = 400.f;
@@ -258,5 +287,105 @@ void ASPlayerCharacter::InputChangeView(const FInputActionValue& InValue)
 	case EViewMode::End:
 	default:
 		break;
+	}
+}
+
+void ASPlayerCharacter::InputQuickSlot01(const FInputActionValue& InValue)
+{
+	FName WeaponSocket(TEXT("WeaponSocket"));
+	if (GetMesh()->DoesSocketExist(WeaponSocket) == true && IsValid(WeaponInstance) == false)
+	{
+		WeaponInstance = GetWorld()->SpawnActor<ASWeaponActor>(WeaponClass, FVector::ZeroVector, FRotator::ZeroRotator);
+		if (IsValid(WeaponInstance) == true)
+		{
+			WeaponInstance->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponSocket);
+		}
+	}
+}
+
+void ASPlayerCharacter::InputQuickSlot02(const FInputActionValue& InValue)
+{
+	if (IsValid(WeaponInstance) == true)
+	{
+		WeaponInstance->Destroy();
+		WeaponInstance = nullptr;
+	}
+}
+
+void ASPlayerCharacter::InputAttack(const FInputActionValue& InValue)
+{
+	if (GetCharacterMovement()->IsFalling() == true)
+	{
+		return;
+	}
+
+	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
+
+	if (IsValid(WeaponInstance) == true)
+	{
+		if (IsValid(WeaponInstance->GetMeleeAttackMontage()) == true)
+		{
+			if (0 == CurrentComboCount)
+			{
+				BeginCombo();
+			}
+			else
+			{
+				ensure(FMath::IsWithinInclusive<int32>(CurrentComboCount, 1, MaxComboCount));
+				bIsAttackKeyPressed = true;
+			}
+		}
+	}
+}
+
+void ASPlayerCharacter::BeginCombo()
+{
+	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
+	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
+
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_None);
+	bIsNowAttacking = true;
+	AnimInstance->PlayAnimMontage(WeaponInstance->GetMeleeAttackMontage());
+
+	CurrentComboCount = 1;
+
+	if (OnMeleeAttackMontageEndedDelegate.IsBound() == false)
+	{
+		OnMeleeAttackMontageEndedDelegate.BindUObject(this, &ThisClass::EndCombo);
+		AnimInstance->Montage_SetEndDelegate(OnMeleeAttackMontageEndedDelegate, WeaponInstance->GetMeleeAttackMontage());
+	}
+}
+
+void ASPlayerCharacter::OnCheckAttackInput()
+{
+	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
+	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
+
+	if (bIsAttackKeyPressed == true)
+	{
+		CurrentComboCount = FMath::Clamp(CurrentComboCount + 1, 1, MaxComboCount);
+
+		FName NextSectionName = *FString::Printf(TEXT("%s%d"), *AttackAnimMontageSectionName, CurrentComboCount);
+		AnimInstance->Montage_JumpToSection(NextSectionName, WeaponInstance->GetMeleeAttackMontage());
+		bIsAttackKeyPressed = false;
+	}
+}
+
+void ASPlayerCharacter::EndCombo(UAnimMontage* InMontage, bool bInterruped)
+{
+	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
+
+	ensureMsgf(CurrentComboCount != 0, TEXT("CurrentComboCount == 0"));
+	CurrentComboCount = 0;
+	bIsAttackKeyPressed = false;
+	bIsNowAttacking = false;
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+
+	if (OnMeleeAttackMontageEndedDelegate.IsBound() == true)
+	{
+		OnMeleeAttackMontageEndedDelegate.Unbind();
 	}
 }
