@@ -46,12 +46,6 @@ public:
 
 	float GetRightInputValue() const { return RightInputValue; }
 
-	UFUNCTION()
-	void OnMeleeAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
-
-	UFUNCTION()
-	void OnCheckHit();
-
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -67,14 +61,6 @@ private:
 	void InputQuickSlot02(const FInputActionValue& InValue);
 
 	void InputAttack(const FInputActionValue& InValue);
-
-	void BeginCombo();
-
-	UFUNCTION()
-	void OnCheckAttackInput();
-
-	UFUNCTION()
-	void EndCombo(UAnimMontage* InMontage, bool bInterruped);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
@@ -107,24 +93,5 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
 	float RightInputValue;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
-	TSubclassOf<ASWeaponActor> WeaponClass;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
-	TObjectPtr<ASWeaponActor> WeaponInstance;
-
-	bool bIsNowAttacking = false;
-
-	FString AttackAnimMontageSectionName = FString(TEXT("Attack"));
-
-	int32 MaxComboCount = 3;
-
-	int32 CurrentComboCount = 0;
-
-	bool bIsAttackKeyPressed = false;
-	// 시리얼라이즈 되거나 레플리케이션 될 필요 없으므로 그냥 bool 자료형 사용.
-
-	FOnMontageEnded OnMeleeAttackMontageEndedDelegate;
 
 };

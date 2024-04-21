@@ -11,6 +11,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Item/SWeaponActor.h"
 #include "Animation/SAnimInstance.h"
+#include "Engine/EngineTypes.h"
+#include "Engine/DamageEvents.h"
 
 ASPlayerCharacter::ASPlayerCharacter()
 {
@@ -36,14 +38,6 @@ void ASPlayerCharacter::BeginPlay()
 		{
 			Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 0);
 		}
-	}
-
-	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
-	if (IsValid(AnimInstance) == true)
-	{
-		AnimInstance->OnMontageEnded.AddDynamic(this, &ThisClass::OnMeleeAttackMontageEnded);
-		AnimInstance->OnCheckHit.AddDynamic(this, &ThisClass::OnCheckHit);
-		AnimInstance->OnCheckAttackInput.AddDynamic(this, &ThisClass::OnCheckAttackInput);
 	}
 }
 
@@ -161,21 +155,6 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 		SpringArmComponent->TargetArmLength = FMath::FInterpTo(SpringArmComponent->TargetArmLength, DestArmLength, DeltaSeconds, ArmLengthChangeSpeed);
 		SpringArmComponent->SetRelativeRotation(FMath::RInterpTo(SpringArmComponent->GetRelativeRotation(), DestArmRotation, DeltaSeconds, ArmRotationChangeSpeed));
 	}
-}
-
-void ASPlayerCharacter::OnMeleeAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-	if (Montage->GetName().Equals(TEXT("AM_Rifle_Fire_Melee"), ESearchCase::IgnoreCase) == true)
-	{
-		GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
-		bIsNowAttacking = false;
-	}
-}
-
-void ASPlayerCharacter::OnCheckHit()
-{
-	UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("CheckHit() has been called.")));
-	// 다음 단원에서 Collision에 대해 배움.
 }
 
 void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -328,7 +307,7 @@ void ASPlayerCharacter::InputAttack(const FInputActionValue& InValue)
 		{
 			if (0 == CurrentComboCount)
 			{
-				BeginCombo();
+				BeginAttack();
 			}
 			else
 			{
@@ -336,56 +315,5 @@ void ASPlayerCharacter::InputAttack(const FInputActionValue& InValue)
 				bIsAttackKeyPressed = true;
 			}
 		}
-	}
-}
-
-void ASPlayerCharacter::BeginCombo()
-{
-	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
-	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
-	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
-
-	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_None);
-	bIsNowAttacking = true;
-	AnimInstance->PlayAnimMontage(WeaponInstance->GetMeleeAttackMontage());
-
-	CurrentComboCount = 1;
-
-	if (OnMeleeAttackMontageEndedDelegate.IsBound() == false)
-	{
-		OnMeleeAttackMontageEndedDelegate.BindUObject(this, &ThisClass::EndCombo);
-		AnimInstance->Montage_SetEndDelegate(OnMeleeAttackMontageEndedDelegate, WeaponInstance->GetMeleeAttackMontage());
-	}
-}
-
-void ASPlayerCharacter::OnCheckAttackInput()
-{
-	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
-	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
-	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
-
-	if (bIsAttackKeyPressed == true)
-	{
-		CurrentComboCount = FMath::Clamp(CurrentComboCount + 1, 1, MaxComboCount);
-
-		FName NextSectionName = *FString::Printf(TEXT("%s%d"), *AttackAnimMontageSectionName, CurrentComboCount);
-		AnimInstance->Montage_JumpToSection(NextSectionName, WeaponInstance->GetMeleeAttackMontage());
-		bIsAttackKeyPressed = false;
-	}
-}
-
-void ASPlayerCharacter::EndCombo(UAnimMontage* InMontage, bool bInterruped)
-{
-	checkf(IsValid(WeaponInstance) == true, TEXT("Invalid WeaponInstance"));
-
-	ensureMsgf(CurrentComboCount != 0, TEXT("CurrentComboCount == 0"));
-	CurrentComboCount = 0;
-	bIsAttackKeyPressed = false;
-	bIsNowAttacking = false;
-	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
-
-	if (OnMeleeAttackMontageEndedDelegate.IsBound() == true)
-	{
-		OnMeleeAttackMontageEndedDelegate.Unbind();
 	}
 }
