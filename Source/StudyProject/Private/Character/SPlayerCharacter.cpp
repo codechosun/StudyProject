@@ -13,6 +13,7 @@
 #include "Animation/SAnimInstance.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/DamageEvents.h"
+#include "Particles/ParticleSystemComponent.h"
 
 ASPlayerCharacter::ASPlayerCharacter()
 {
@@ -24,6 +25,10 @@ ASPlayerCharacter::ASPlayerCharacter()
 
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
 	CameraComponent->SetupAttachment(SpringArmComponent);
+
+	ParticleSystemComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("ParticleSystemComponent"));
+	ParticleSystemComponent->SetupAttachment(GetRootComponent());
+	ParticleSystemComponent->SetAutoActivate(false);
 }
 
 void ASPlayerCharacter::BeginPlay()
@@ -157,6 +162,12 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 	}
 }
 
+void ASPlayerCharacter::AddCurrentKillCount(int32 InCurrentKillCount)
+{
+	CurrentKillCount = FMath::Clamp(CurrentKillCount + InCurrentKillCount, 0.f, MaxKillCount);
+	ParticleSystemComponent->Activate(true);
+}
+
 void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -176,6 +187,11 @@ void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void ASPlayerCharacter::InputMove(const FInputActionValue& InValue)
 {
+	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || bIsDead == true)
+	{
+		return;
+	}
+
 	FVector2D MovementVector = InValue.Get<FVector2D>();
 
 	switch (CurrentViewMode)
@@ -213,6 +229,11 @@ void ASPlayerCharacter::InputMove(const FInputActionValue& InValue)
 
 void ASPlayerCharacter::InputLook(const FInputActionValue& InValue)
 {
+	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || bIsDead == true)
+	{
+		return;
+	}
+
 	FVector2D LookVector = InValue.Get<FVector2D>();
 
 	switch (CurrentViewMode)
