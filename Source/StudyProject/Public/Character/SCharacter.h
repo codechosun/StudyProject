@@ -7,6 +7,8 @@
 #include "SCharacter.generated.h"
 
 class ASWeaponActor;
+class USStatComponent;
+class UStudyWidget;
 
 UCLASS()
 class STUDYPROJECT_API ASCharacter : public ACharacter
@@ -20,17 +22,13 @@ public:
 
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
-	float GetMaxHP() const { return MaxHP; }
+	USStatComponent* GetStatComponent() const { return StatComponent; }
 
-	float GetCurrentHP() const { return CurrentHP; }
-
-	void SetMaxHP(float InMaxHP) { MaxHP = InMaxHP; }
-
-	void SetCurrentHP(float InCurrentHP) { CurrentHP = InCurrentHP; }
-
-	bool IsDead() const { return bIsDead; }
+	virtual void SetWidget(UStudyWidget* InStudyWidget) {}
 
 protected:
 	UFUNCTION()
@@ -46,6 +44,9 @@ protected:
 
 	UFUNCTION()
 	virtual void EndAttack(UAnimMontage* InMontage, bool bInterruped);
+
+	UFUNCTION()
+	void OnCharacterDeath();
 
 public:
 	static int32 ShowAttackDebug;
@@ -75,13 +76,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
 	float MeleeAttackRadius = 20.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
-	float MaxHP = 200.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
-	float CurrentHP = 200.f;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
-	uint8 bIsDead : 1;
+	TObjectPtr<USStatComponent> StatComponent;
 
 };

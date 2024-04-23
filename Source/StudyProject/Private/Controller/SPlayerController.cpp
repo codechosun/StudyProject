@@ -2,6 +2,10 @@
 
 
 #include "Controller/SPlayerController.h"
+#include "UI/SHUD.h"
+#include "Game/SPlayerState.h"
+#include "Component/SStatComponent.h"
+#include "Character/SCharacter.h"
 
 ASPlayerController::ASPlayerController()
 {
@@ -57,6 +61,31 @@ void ASPlayerController::BeginPlay()
 
     FInputModeGameOnly InputModeGameOnly;
     SetInputMode(InputModeGameOnly);
+
+    if (IsValid(HUDWidgetClass) == true)
+    {
+        HUDWidget = CreateWidget<USHUD>(this, HUDWidgetClass);
+        if (IsValid(HUDWidget) == true)
+        {
+            HUDWidget->AddToViewport();
+
+            ASPlayerState* SPlayerState = GetPlayerState<ASPlayerState>();
+            if (IsValid(SPlayerState) == true)
+            {
+                HUDWidget->BindPlayerState(SPlayerState);
+            }
+
+            ASCharacter* PC = GetPawn<ASCharacter>();
+            if (IsValid(PC) == true)
+            {
+                USStatComponent* StatComponent = PC->GetStatComponent();
+                if (IsValid(StatComponent) == true)
+                {
+                    HUDWidget->BindStatComponent(StatComponent);
+                }
+            }
+        }
+    }
 }
 /*
 void ASPlayerController::EndPlay(EEndPlayReason::Type EndPlayReason)

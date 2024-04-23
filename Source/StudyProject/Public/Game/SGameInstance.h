@@ -3,10 +3,31 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/GameInstance.h" // SUnrealObject와 다른 이유를 생각해보자. 
+#include "Engine/GameInstance.h"
+#include "Engine/DataTable.h"
 #include "SGameInstance.generated.h"
 
-class USPigeon;
+class UDataTable;
+
+USTRUCT(BlueprintType)
+struct FSStatTableRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+public:
+	FSStatTableRow()
+	{
+
+	}
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float MaxHP;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float MaxKillCount;
+
+};
 
 /**
  *
@@ -14,20 +35,19 @@ class USPigeon;
 UCLASS()
 class STUDYPROJECT_API USGameInstance : public UGameInstance
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	USGameInstance();
+    virtual void Init() override;
 
-	virtual void Init() override;
+    virtual void Shutdown() override;
 
-	virtual void Shutdown() override;
+	const UDataTable* GetCharacterStatDataTable() const { return CharacterStatDataTable; }
 
-protected:
-	UPROPERTY()
-	FString Name;
+	FSStatTableRow* GetCharacterStatDataTableRow(int32 InLevel);
 
-	UPROPERTY()
-	TObjectPtr<USPigeon> SpawnedPigeon;
+private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Meta = (AllowPrivateAccess))
+	TObjectPtr<UDataTable> CharacterStatDataTable;
 
 };

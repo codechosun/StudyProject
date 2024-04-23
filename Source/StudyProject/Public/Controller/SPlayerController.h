@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "SPlayerController.generated.h"
 
+class USHUD;
+
 /**
  *
  */
@@ -17,7 +19,16 @@ class STUDYPROJECT_API ASPlayerController : public APlayerController
 public:
     ASPlayerController();
 
+    USHUD* GetHUDWidget() const { return HUDWidget; };
+
 protected:
     virtual void BeginPlay() override;
+
+private:
+    UPROPERTY();
+    TObjectPtr<USHUD> HUDWidget;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess));
+    TSubclassOf<USHUD> HUDWidgetClass;
 
 };

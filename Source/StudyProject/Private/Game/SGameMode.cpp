@@ -4,6 +4,7 @@
 #include "Game/SGameMode.h"
 #include "Controller/SPlayerController.h"
 #include "Character/SPlayerPawn.h"
+#include "Game/SPlayerState.h"
 
 ASGameMode::ASGameMode()
 {
@@ -50,7 +51,11 @@ APlayerController* ASGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, 
 
 void ASGameMode::PostLogin(APlayerController* NewPlayer)
 {
-    UE_LOG(LogTemp, Error, TEXT("         Start ASGameMode::        PostLogin(ASPlayerController)"));
     Super::PostLogin(NewPlayer);
-    UE_LOG(LogTemp, Error, TEXT("         End   ASGameMode::        PostLogin(ASPlayerController)"));
+
+    ASPlayerState* PlayerState = NewPlayer->GetPlayerState<ASPlayerState>();
+    if (true == ::IsValid(PlayerState))
+    {
+        PlayerState->InitPlayerState();
+    }
 }

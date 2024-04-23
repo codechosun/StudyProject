@@ -14,6 +14,10 @@
 #include "Engine/EngineTypes.h"
 #include "Engine/DamageEvents.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "Component/SStatComponent.h"
+#include "SPlayerCharacterSettings.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 
 ASPlayerCharacter::ASPlayerCharacter()
 {
@@ -29,6 +33,15 @@ ASPlayerCharacter::ASPlayerCharacter()
 	ParticleSystemComponent = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("ParticleSystemComponent"));
 	ParticleSystemComponent->SetupAttachment(GetRootComponent());
 	ParticleSystemComponent->SetAutoActivate(false);
+
+	const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
+	if (0 < CDO->PlayerCharacterMeshMaterialPaths.Num())
+	{
+		for (FSoftObjectPath PlayerCharacterMeshPath : CDO->PlayerCharacterMeshMaterialPaths)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Path: %s"), *(PlayerCharacterMeshPath.ToString()));
+		}
+	}
 }
 
 void ASPlayerCharacter::BeginPlay()
@@ -44,6 +57,22 @@ void ASPlayerCharacter::BeginPlay()
 			Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 0);
 		}
 	}
+
+	const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
+	int32 RandIndex = FMath::RandRange(0, CDO->PlayerCharacterMeshMaterialPaths.Num() - 1);
+	CurrentPlayerCharacterMeshMaterialPath = CDO->PlayerCharacterMeshMaterialPaths[RandIndex];
+	AssetStreamableHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		CurrentPlayerCharacterMeshMaterialPath,
+		FStreamableDelegate::CreateLambda([this]() -> void
+			{
+				AssetStreamableHandle->ReleaseHandle();
+				TSoftObjectPtr<UMaterial> LoadedMaterialInstanceAsset(CurrentPlayerCharacterMeshMaterialPath);
+				if (LoadedMaterialInstanceAsset.IsValid() == true)
+				{
+					GetMesh()->SetMaterial(0, LoadedMaterialInstanceAsset.Get());
+				}
+			})
+	);
 }
 
 void ASPlayerCharacter::PossessedBy(AController* NewController)
@@ -162,12 +191,6 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 	}
 }
 
-void ASPlayerCharacter::AddCurrentKillCount(int32 InCurrentKillCount)
-{
-	CurrentKillCount = FMath::Clamp(CurrentKillCount + InCurrentKillCount, 0.f, MaxKillCount);
-	ParticleSystemComponent->Activate(true);
-}
-
 void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -187,7 +210,7 @@ void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void ASPlayerCharacter::InputMove(const FInputActionValue& InValue)
 {
-	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || bIsDead == true)
+	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || StatComponent->GetCurrentHP() <= KINDA_SMALL_NUMBER)
 	{
 		return;
 	}
@@ -229,7 +252,7 @@ void ASPlayerCharacter::InputMove(const FInputActionValue& InValue)
 
 void ASPlayerCharacter::InputLook(const FInputActionValue& InValue)
 {
-	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || bIsDead == true)
+	if (GetCharacterMovement()->GetGroundMovementMode() == MOVE_None || StatComponent->GetCurrentHP() <= KINDA_SMALL_NUMBER)
 	{
 		return;
 	}

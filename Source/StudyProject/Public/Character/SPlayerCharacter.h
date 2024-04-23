@@ -12,6 +12,7 @@ class UCameraComponent;
 class USInputConfig;
 class UInputMappingContext;
 class ASWeaponActor;
+struct FStreamableHandle;
 
 UENUM(BlueprintType)
 enum class EViewMode : uint8
@@ -47,14 +48,6 @@ public:
 	float GetRightInputValue() const { return RightInputValue; }
 
 	UParticleSystemComponent* GetParticleSystem() const { return ParticleSystemComponent; }
-
-	int32 GetMaxKillCount() const { return MaxKillCount; }
-
-	void SetMaxKillCount(int32 InMaxKillCount) { MaxKillCount = InMaxKillCount; }
-
-	int32 GetCurrentKillCount() const { return CurrentKillCount; }
-
-	void AddCurrentKillCount(int32 InCurrentKillCount);
 
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -107,10 +100,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess))
 	TObjectPtr<UParticleSystemComponent> ParticleSystemComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess = true))
-	int32 CurrentKillCount = 0;
+	FSoftObjectPath CurrentPlayerCharacterMeshMaterialPath = FSoftObjectPath();
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess = true))
-	int32 MaxKillCount = 99;
+	TSharedPtr<FStreamableHandle> AssetStreamableHandle = nullptr;
 
 };

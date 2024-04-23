@@ -9,6 +9,7 @@
 #include "Engine/DamageEvents.h"
 #include "Animation/SAnimInstance.h"
 #include "Item/SWeaponActor.h"
+#include "Component/SStatComponent.h"
 
 int32 ASCharacter::ShowAttackDebug = 0;
 
@@ -39,7 +40,7 @@ ASCharacter::ASCharacter()
 	GetCharacterMovement()->AirControl = 0.35f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 
-	bIsDead = false;
+	StatComponent = CreateDefaultSubobject<USStatComponent>(TEXT("StatComponent"));
 }
 
 void ASCharacter::BeginPlay()
@@ -53,25 +54,32 @@ void ASCharacter::BeginPlay()
 		AnimInstance->OnCheckHit.AddDynamic(this, &ThisClass::OnCheckHit);
 		AnimInstance->OnCheckAttackInput.AddDynamic(this, &ThisClass::OnCheckAttackInput);
 	}
+
+	if (IsValid(StatComponent) == true && StatComponent->OnOutOfCurrentHPDelegate.IsAlreadyBound(this, &ThisClass::OnCharacterDeath) == false)
+	{
+		StatComponent->OnOutOfCurrentHPDelegate.AddDynamic(this, &ThisClass::OnCharacterDeath);
+	}
+}
+
+void ASCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (true == StatComponent->OnOutOfCurrentHPDelegate.IsAlreadyBound(this, &ThisClass::OnCharacterDeath))
+	{
+		StatComponent->OnOutOfCurrentHPDelegate.RemoveDynamic(this, &ThisClass::OnCharacterDeath);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 float ASCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	float FinalDamageAmount = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
-	CurrentHP = FMath::Clamp(CurrentHP - FinalDamageAmount, 0.f, MaxHP);
-
-	if (CurrentHP < KINDA_SMALL_NUMBER)
-	{
-		bIsDead = true;
-		CurrentHP = 0.f;
-		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_None);
-	}
+	StatComponent->SetCurrentHP(StatComponent->GetCurrentHP() - FinalDamageAmount);
 
 	if (ShowAttackDebug == 1)
 	{
-		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("%s [%.1f / %.1f]"), *GetName(), CurrentHP, MaxHP));
+		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("%s [%.1f / %.1f]"), *GetName(), StatComponent->GetCurrentHP(), StatComponent->GetMaxHP()));
 	}
 
 	return FinalDamageAmount;
@@ -191,4 +199,10 @@ void ASCharacter::EndAttack(UAnimMontage* InMontage, bool bInterruped)
 	{
 		OnMeleeAttackMontageEndedDelegate.Unbind();
 	}
+}
+
+void ASCharacter::OnCharacterDeath()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_None);
 }
