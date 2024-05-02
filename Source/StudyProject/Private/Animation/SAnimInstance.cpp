@@ -42,6 +42,43 @@ void USAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			bIsFalling = CharacterMovementComponent->IsFalling();
 			bIsCrouching = CharacterMovementComponent->IsCrouching();
 			bIsDead = OwnerCharacter->GetStatComponent()->GetCurrentHP() <= KINDA_SMALL_NUMBER;
+			Acceleration = CharacterMovementComponent->GetCurrentAcceleration();
+
+			if (Acceleration.Length() < KINDA_SMALL_NUMBER && Velocity.Length() < KINDA_SMALL_NUMBER)
+			{
+				LocomotionState = ELocomotionState::Idle;
+			}
+			else
+			{
+				LocomotionState = ELocomotionState::Walk;
+			}
+
+			ASPlayerCharacter* OwnerPlayerCharacter = Cast<ASPlayerCharacter>(OwnerCharacter);
+			if (IsValid(OwnerPlayerCharacter) == true)
+			{
+				if (KINDA_SMALL_NUMBER < OwnerPlayerCharacter->GetForwardInputValue())
+				{
+					MovementDirection = EMovementDirection::Fwd;
+				}
+
+				if (OwnerPlayerCharacter->GetForwardInputValue() < -KINDA_SMALL_NUMBER)
+				{
+					MovementDirection = EMovementDirection::Bwd;
+				}
+
+				if (KINDA_SMALL_NUMBER < OwnerPlayerCharacter->GetRightInputValue())
+				{
+					MovementDirection = EMovementDirection::Right;
+				}
+
+				if (OwnerPlayerCharacter->GetRightInputValue() < -KINDA_SMALL_NUMBER)
+				{
+					MovementDirection = EMovementDirection::Left;
+				}
+
+				ControlRotation.Pitch = OwnerPlayerCharacter->GetCurrentAimPitch();
+				ControlRotation.Yaw = OwnerPlayerCharacter->GetCurrentAimYaw();
+			}
 		}
 	}
 }

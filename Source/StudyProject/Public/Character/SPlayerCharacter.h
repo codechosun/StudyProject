@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Character/SCharacter.h"
 #include "InputActionValue.h"
+#include "Game/SPlayerState.h"
 #include "SPlayerCharacter.generated.h"
 
 class USpringArmComponent;
@@ -13,6 +14,7 @@ class USInputConfig;
 class UInputMappingContext;
 class ASWeaponActor;
 struct FStreamableHandle;
+class UCameraShakeBase;
 
 UENUM(BlueprintType)
 enum class EViewMode : uint8
@@ -49,6 +51,14 @@ public:
 
 	UParticleSystemComponent* GetParticleSystem() const { return ParticleSystemComponent; }
 
+	void SetMeshMaterial(const EPlayerTeam& InPlayerTeam);
+
+	float GetCurrentAimPitch() const { return CurrentAimPitch; }
+
+	float GetCurrentAimYaw() const { return CurrentAimYaw; }
+
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -64,6 +74,23 @@ private:
 	void InputQuickSlot02(const FInputActionValue& InValue);
 
 	void InputAttack(const FInputActionValue& InValue);
+
+	void InputMenu(const FInputActionValue& InValue);
+
+	void TryFire();
+
+	void StartIronSight(const FInputActionValue& InValue);
+
+	void EndIronSight(const FInputActionValue& InValue);
+
+	void ToggleTrigger(const FInputActionValue& InValue);
+
+	void StartFire(const FInputActionValue& InValue);
+
+	void StopFire(const FInputActionValue& InValue);
+
+	UFUNCTION()
+	void OnHittedRagdollRestoreTimerElapsed();
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
@@ -103,5 +130,35 @@ protected:
 	FSoftObjectPath CurrentPlayerCharacterMeshMaterialPath = FSoftObjectPath();
 
 	TSharedPtr<FStreamableHandle> AssetStreamableHandle = nullptr;
+
+	float TargetFOV = 70.f;
+
+	float CurrentFOV = 70.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Meta = (AllowPrivateAccess))
+	float FirePerMinute = 600;
+
+	bool bIsTriggerToggle = false;
+
+	FTimerHandle BetweenShotsTimer;
+
+	float TimeBetweenFire;
+
+	float CurrentAimPitch = 0.f;
+
+	float CurrentAimYaw = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = ASPlayerCharacter, Meta = (AllowPrivateAccess = true))
+	TSubclassOf<UCameraShakeBase> FireShake;
+
+	FTimerHandle HittedRagdollRestoreTimer;
+
+	FTimerDelegate HittedRagdollRestoreTimerDelegate;
+
+	float TargetRagDollBlendWeight = 0.f;
+
+	float CurrentRagDollBlendWeight = 0.f;
+
+	bool bIsNowRagdollBlending = false;
 
 };

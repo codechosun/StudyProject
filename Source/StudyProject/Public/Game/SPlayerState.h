@@ -6,6 +6,15 @@
 #include "GameFramework/PlayerState.h"
 #include "SPlayerState.generated.h"
 
+UENUM(BlueprintType)
+enum class EPlayerTeam : uint8
+{
+	None,
+	Black,
+	White,
+	End
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCurrentKillCountChangedDelegate, int32, InOldCurrentKillCount, int32, InNewCurrentKillCount);
 
 UCLASS()
@@ -26,6 +35,8 @@ public:
 
 	void AddCurrentKillCount(int32 InCurrentKillCount);
 
+	EPlayerTeam GetPlayerTeam() const { return PlayerTeam; }
+
 public:
 	FOnCurrentKillCountChangedDelegate OnCurrentKillCountChangedDelegate;
 
@@ -35,5 +46,8 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess = true))
 	int32 MaxKillCount = 99;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (AllowPrivateAccess = true))
+	EPlayerTeam PlayerTeam = EPlayerTeam::None;
 
 };

@@ -18,10 +18,11 @@
 #include "SPlayerCharacterSettings.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "Controller/SPlayerController.h"
 
 ASPlayerCharacter::ASPlayerCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	SpringArmComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComponent"));
 	SpringArmComponent->SetupAttachment(RootComponent);
@@ -42,6 +43,8 @@ ASPlayerCharacter::ASPlayerCharacter()
 			UE_LOG(LogTemp, Warning, TEXT("Path: %s"), *(PlayerCharacterMeshPath.ToString()));
 		}
 	}
+
+	TimeBetweenFire = 60.f / FirePerMinute;
 }
 
 void ASPlayerCharacter::BeginPlay()
@@ -57,22 +60,6 @@ void ASPlayerCharacter::BeginPlay()
 			Subsystem->AddMappingContext(PlayerCharacterInputMappingContext, 0);
 		}
 	}
-
-	const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
-	int32 RandIndex = FMath::RandRange(0, CDO->PlayerCharacterMeshMaterialPaths.Num() - 1);
-	CurrentPlayerCharacterMeshMaterialPath = CDO->PlayerCharacterMeshMaterialPaths[RandIndex];
-	AssetStreamableHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		CurrentPlayerCharacterMeshMaterialPath,
-		FStreamableDelegate::CreateLambda([this]() -> void
-			{
-				AssetStreamableHandle->ReleaseHandle();
-				TSoftObjectPtr<UMaterial> LoadedMaterialInstanceAsset(CurrentPlayerCharacterMeshMaterialPath);
-				if (LoadedMaterialInstanceAsset.IsValid() == true)
-				{
-					GetMesh()->SetMaterial(0, LoadedMaterialInstanceAsset.Get());
-				}
-			})
-	);
 }
 
 void ASPlayerCharacter::PossessedBy(AController* NewController)
@@ -164,6 +151,40 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	CurrentFOV = FMath::FInterpTo(CurrentFOV, TargetFOV, DeltaSeconds, 35.f);
+	CameraComponent->SetFieldOfView(CurrentFOV);
+
+	if (IsValid(GetController()) == true)
+	{
+		FRotator ControlRotation = GetController()->GetControlRotation();
+		CurrentAimPitch = ControlRotation.Pitch;
+		CurrentAimYaw = ControlRotation.Yaw;
+	}
+
+	if (true == bIsNowRagdollBlending)
+	{
+		CurrentRagDollBlendWeight = FMath::FInterpTo(CurrentRagDollBlendWeight, TargetRagDollBlendWeight, DeltaSeconds, 10.f);
+
+		FName PivotBoneName = FName(TEXT("spine_01"));
+		GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(PivotBoneName, CurrentRagDollBlendWeight);
+
+		if (CurrentRagDollBlendWeight - TargetRagDollBlendWeight < KINDA_SMALL_NUMBER)
+		{
+			GetMesh()->SetAllBodiesBelowSimulatePhysics(PivotBoneName, false);
+			bIsNowRagdollBlending = false;
+		}
+
+		if (true == ::IsValid(GetStatComponent()) && GetStatComponent()->GetCurrentHP() < KINDA_SMALL_NUMBER)
+		{
+			GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(FName(TEXT("root")), 1.f);
+			// 모든 본에 렉돌 가중치
+			GetMesh()->SetSimulatePhysics(true);
+			bIsNowRagdollBlending = false;
+		}
+	}
+
+	return;
+
 	switch (CurrentViewMode)
 	{
 	case EViewMode::BackView:
@@ -191,6 +212,63 @@ void ASPlayerCharacter::Tick(float DeltaSeconds)
 	}
 }
 
+void ASPlayerCharacter::SetMeshMaterial(const EPlayerTeam& InPlayerTeam)
+{
+	uint8 TeamIdx = 0u;
+	switch (InPlayerTeam)
+	{
+	case EPlayerTeam::Black:
+		TeamIdx = 0u;
+		break;
+	case EPlayerTeam::White:
+		TeamIdx = 1u;
+		break;
+	default:
+		break;
+	}
+
+	const USPlayerCharacterSettings* CDO = GetDefault<USPlayerCharacterSettings>();
+	CurrentPlayerCharacterMeshMaterialPath = CDO->PlayerCharacterMeshMaterialPaths[TeamIdx];
+	AssetStreamableHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		CurrentPlayerCharacterMeshMaterialPath,
+		FStreamableDelegate::CreateLambda([this]() -> void
+			{
+				AssetStreamableHandle->ReleaseHandle();
+				TSoftObjectPtr<UMaterial> LoadedMaterialInstanceAsset(CurrentPlayerCharacterMeshMaterialPath);
+				if (LoadedMaterialInstanceAsset.IsValid() == true)
+				{
+					GetMesh()->SetMaterial(0, LoadedMaterialInstanceAsset.Get());
+				}
+			})
+	);
+}
+
+float ASPlayerCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	float FinalDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	if (IsValid(GetStatComponent()) == false)
+	{
+		return FinalDamage;
+	}
+
+	if (GetStatComponent()->GetCurrentHP() < KINDA_SMALL_NUMBER)
+	{
+		GetMesh()->SetSimulatePhysics(true);
+	}
+	else
+	{
+		FName PivotBoneName = FName(TEXT("spine_01"));
+		GetMesh()->SetAllBodiesBelowSimulatePhysics(PivotBoneName, true);
+		TargetRagDollBlendWeight = 1.f;
+
+		HittedRagdollRestoreTimerDelegate.BindUObject(this, &ThisClass::OnHittedRagdollRestoreTimerElapsed);
+		GetWorld()->GetTimerManager().SetTimer(HittedRagdollRestoreTimer, HittedRagdollRestoreTimerDelegate, 1.f, false);
+	}
+
+	return FinalDamage;
+}
+
 void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -205,6 +283,12 @@ void ASPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->QuickSlot01, ETriggerEvent::Started, this, &ThisClass::InputQuickSlot01);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->QuickSlot02, ETriggerEvent::Started, this, &ThisClass::InputQuickSlot02);
 		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Attack, ETriggerEvent::Started, this, &ThisClass::InputAttack);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Menu, ETriggerEvent::Started, this, &ThisClass::InputMenu);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IronSight, ETriggerEvent::Started, this, &ThisClass::StartIronSight);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->IronSight, ETriggerEvent::Completed, this, &ThisClass::EndIronSight);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Trigger, ETriggerEvent::Started, this, &ThisClass::ToggleTrigger);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Attack, ETriggerEvent::Started, this, &ThisClass::StartFire);
+		EnhancedInputComponent->BindAction(PlayerCharacterInputConfig->Attack, ETriggerEvent::Completed, this, &ThisClass::StopFire);
 	}
 }
 
@@ -323,6 +407,18 @@ void ASPlayerCharacter::InputQuickSlot01(const FInputActionValue& InValue)
 		{
 			WeaponInstance->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponSocket);
 		}
+
+		TSubclassOf<UAnimInstance> RifleCharacterAnimLayer = WeaponInstance->GetArmedCharacterAnimLayer();
+		if (IsValid(RifleCharacterAnimLayer) == true)
+		{
+			GetMesh()->LinkAnimClassLayers(RifleCharacterAnimLayer);
+		}
+
+		USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+		if (IsValid(AnimInstance) == true && IsValid(WeaponInstance->GetEquipAnimMontage()))
+		{
+			AnimInstance->Montage_Play(WeaponInstance->GetEquipAnimMontage());
+		}
 	}
 }
 
@@ -330,6 +426,18 @@ void ASPlayerCharacter::InputQuickSlot02(const FInputActionValue& InValue)
 {
 	if (IsValid(WeaponInstance) == true)
 	{
+		TSubclassOf<UAnimInstance> UnarmedCharacterAnimLayer = WeaponInstance->GetUnarmedCharacterAnimLayer();
+		if (IsValid(UnarmedCharacterAnimLayer) == true)
+		{
+			GetMesh()->LinkAnimClassLayers(UnarmedCharacterAnimLayer);
+		}
+
+		USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
+		if (IsValid(AnimInstance) == true && IsValid(WeaponInstance->GetUnequipAnimMontage()))
+		{
+			AnimInstance->Montage_Play(WeaponInstance->GetUnequipAnimMontage());
+		}
+
 		WeaponInstance->Destroy();
 		WeaponInstance = nullptr;
 	}
@@ -342,22 +450,174 @@ void ASPlayerCharacter::InputAttack(const FInputActionValue& InValue)
 		return;
 	}
 
-	USAnimInstance* AnimInstance = Cast<USAnimInstance>(GetMesh()->GetAnimInstance());
-	checkf(IsValid(AnimInstance) == true, TEXT("Invalid AnimInstance"));
-
-	if (IsValid(WeaponInstance) == true)
+	if (bIsTriggerToggle == false)
 	{
-		if (IsValid(WeaponInstance->GetMeleeAttackMontage()) == true)
+		TryFire();
+	}
+}
+
+void ASPlayerCharacter::InputMenu(const FInputActionValue& InValue)
+{
+	ASPlayerController* PlayerController = GetController<ASPlayerController>();
+	if (true == ::IsValid(PlayerController))
+	{
+		PlayerController->ToggleInGameMenu();
+	}
+}
+
+void ASPlayerCharacter::TryFire()
+{
+	APlayerController* PlayerController = GetController<APlayerController>();
+	if (IsValid(PlayerController) == true && IsValid(WeaponInstance) == true)
+	{
+#pragma region CaculateTargetTransform
+		float FocalDistance = 400.f;
+		FVector FocalLocation;
+		FVector CameraLocation;
+		FRotator CameraRotation;
+
+		PlayerController->GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+		FVector AimDirectionFromCamera = CameraRotation.Vector().GetSafeNormal();
+		FocalLocation = CameraLocation + (AimDirectionFromCamera * FocalDistance);
+
+		FVector WeaponMuzzleLocation = WeaponInstance->GetMesh()->GetSocketLocation(TEXT("MuzzleFlash"));
+		FVector FinalFocalLocation = FocalLocation + (((WeaponMuzzleLocation - FocalLocation) | AimDirectionFromCamera) * AimDirectionFromCamera);
+
+		FTransform TargetTransform = FTransform(CameraRotation, FinalFocalLocation);
+
+		if (ShowAttackDebug == 1)
 		{
-			if (0 == CurrentComboCount)
+			DrawDebugSphere(GetWorld(), WeaponMuzzleLocation, 2.f, 16, FColor::Red, false, 180.f);
+
+			DrawDebugSphere(GetWorld(), CameraLocation, 2.f, 16, FColor::Yellow, false, 180.f);
+
+			DrawDebugSphere(GetWorld(), FinalFocalLocation, 2.f, 16, FColor::Magenta, false, 180.f);
+
+			// (WeaponLoc - FocalLoc)
+			DrawDebugLine(GetWorld(), FocalLocation, WeaponMuzzleLocation, FColor::Yellow, false, 180.f, 0, 2.f);
+
+			// AimDir
+			DrawDebugLine(GetWorld(), CameraLocation, FinalFocalLocation, FColor::Blue, false, 180.f, 0, 2.f);
+
+			// Project Direction Line
+			DrawDebugLine(GetWorld(), WeaponMuzzleLocation, FinalFocalLocation, FColor::Red, false, 180.f, 0, 2.f);
+		}
+
+#pragma endregion
+
+#pragma region PerformLineTracing
+
+		FVector BulletDirection = TargetTransform.GetUnitAxis(EAxis::X);
+		FVector StartLocation = TargetTransform.GetLocation();
+		FVector EndLocation = StartLocation + BulletDirection * WeaponInstance->GetMaxRange();
+
+		FHitResult HitResult;
+		FCollisionQueryParams TraceParams(NAME_None, false, this);
+		TraceParams.AddIgnoredActor(WeaponInstance);
+
+		bool IsCollided = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_GameTraceChannel2, TraceParams);
+		if (IsCollided == false)
+		{
+			HitResult.TraceStart = StartLocation;
+			HitResult.TraceEnd = EndLocation;
+		}
+
+		if (ShowAttackDebug == 2)
+		{
+			if (IsCollided == true)
 			{
-				BeginAttack();
+				DrawDebugSphere(GetWorld(), StartLocation, 2.f, 16, FColor::Red, false, 60.f);
+
+				DrawDebugSphere(GetWorld(), HitResult.ImpactPoint, 2.f, 16, FColor::Green, false, 60.f);
+
+				DrawDebugLine(GetWorld(), StartLocation, HitResult.ImpactPoint, FColor::Blue, false, 60.f, 0, 2.f);
 			}
 			else
 			{
-				ensure(FMath::IsWithinInclusive<int32>(CurrentComboCount, 1, MaxComboCount));
-				bIsAttackKeyPressed = true;
+				DrawDebugSphere(GetWorld(), StartLocation, 2.f, 16, FColor::Red, false, 60.f);
+
+				DrawDebugSphere(GetWorld(), EndLocation, 2.f, 16, FColor::Green, false, 60.f);
+
+				DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Blue, false, 60.f, 0, 2.f);
 			}
 		}
+
+#pragma endregion
+
+		if (IsCollided == true)
+		{
+			ASCharacter* HittedCharacter = Cast<ASCharacter>(HitResult.GetActor());
+			if (IsValid(HittedCharacter) == true)
+			{
+				FDamageEvent DamageEvent;
+				//HittedCharacter->TakeDamage(10.f, DamageEvent, GetController(), this);
+
+				FString BoneNameString = HitResult.BoneName.ToString();
+				//UKismetSystemLibrary::PrintString(this, BoneNameString);
+				//DrawDebugSphere(GetWorld(), HitResult.Location, 3.f, 16, FColor(255, 0, 0, 255), true, 20.f, 0U, 5.f);
+
+				if (true == BoneNameString.Equals(FString(TEXT("HEAD")), ESearchCase::IgnoreCase))
+				{
+					HittedCharacter->TakeDamage(100.f, DamageEvent, GetController(), this);
+				}
+				else
+				{
+					HittedCharacter->TakeDamage(10.f, DamageEvent, GetController(), this);
+				}
+			}
+		}
+
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (IsValid(AnimInstance) == true && IsValid(WeaponInstance) == true)
+		{
+			if (AnimInstance->Montage_IsPlaying(WeaponInstance->GetRifleFireAnimMontage()) == false)
+			{
+				AnimInstance->Montage_Play(WeaponInstance->GetRifleFireAnimMontage());
+			}
+		}
+
 	}
+
+	if (IsValid(FireShake) == true)
+	{
+		PlayerController->ClientStartCameraShake(FireShake);
+	}
+
+}
+
+void ASPlayerCharacter::StartIronSight(const FInputActionValue& InValue)
+{
+	TargetFOV = 45.f;
+}
+
+void ASPlayerCharacter::EndIronSight(const FInputActionValue& InValue)
+{
+	TargetFOV = 70.f;
+}
+
+void ASPlayerCharacter::ToggleTrigger(const FInputActionValue& InValue)
+{
+	bIsTriggerToggle = !bIsTriggerToggle;
+}
+
+void ASPlayerCharacter::StartFire(const FInputActionValue& InValue)
+{
+	if (bIsTriggerToggle == true)
+	{
+		GetWorldTimerManager().SetTimer(BetweenShotsTimer, this, &ThisClass::TryFire, TimeBetweenFire, true);
+	}
+}
+
+void ASPlayerCharacter::StopFire(const FInputActionValue& InValue)
+{
+	GetWorldTimerManager().ClearTimer(BetweenShotsTimer);
+}
+
+void ASPlayerCharacter::OnHittedRagdollRestoreTimerElapsed()
+{
+	FName PivotBoneName = FName(TEXT("spine_01"));
+	TargetRagDollBlendWeight = 0.f;
+	CurrentRagDollBlendWeight = 1.f;
+	bIsNowRagdollBlending = true;
 }
