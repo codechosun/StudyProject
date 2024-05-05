@@ -28,6 +28,12 @@ public:
 
     void SetCurrentHP(float InCurrentHP);
 
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const;
+
+private:
+    UFUNCTION(NetMulticast, Reliable)
+    void OnCurrentHPChanged_NetMulticast(float InOldCurrentHP, float InNewCurrentHP);
+
 public:
     FOnOutOfCurrentHPDelegate OnOutOfCurrentHPDelegate;
 
@@ -39,10 +45,10 @@ private:
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "USStatComponent", Meta = (AllowPrivateAccess))
     TObjectPtr<class USGameInstance> GameInstance;
 
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "USStatComponent", Meta = (AllowPrivateAccess))
+    UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "USStatComponent", Meta = (AllowPrivateAccess))
     float MaxHP;
 
-    UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "USStatComponent", Meta = (AllowPrivateAccess))
+    UPROPERTY(Replicated, Transient, VisibleInstanceOnly, BlueprintReadOnly, Category = "USStatComponent", Meta = (AllowPrivateAccess))
     float CurrentHP;
 
 };

@@ -10,6 +10,11 @@
 #include "Animation/SAnimInstance.h"
 #include "Item/SWeaponActor.h"
 #include "Component/SStatComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "Engine/Engine.h"
+#include "Controller/SPlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Game/SGameState.h"
 
 int32 ASCharacter::ShowAttackDebug = 0;
 
@@ -41,6 +46,7 @@ ASCharacter::ASCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 
 	StatComponent = CreateDefaultSubobject<USStatComponent>(TEXT("StatComponent"));
+	StatComponent->SetIsReplicated(true);
 }
 
 void ASCharacter::BeginPlay()
@@ -75,6 +81,12 @@ float ASCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEven
 {
 	float FinalDamageAmount = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
+	ASGameState* SGameState = Cast<ASGameState>(UGameplayStatics::GetGameState(this));
+	if (IsValid(SGameState) == true && SGameState->MatchState != EMatchState::Playing)
+	{
+		return FinalDamageAmount;
+	}
+
 	StatComponent->SetCurrentHP(StatComponent->GetCurrentHP() - FinalDamageAmount);
 
 	if (ShowAttackDebug == 1)
@@ -83,6 +95,13 @@ float ASCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEven
 	}
 
 	return FinalDamageAmount;
+}
+
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ThisClass, WeaponInstance);
 }
 
 void ASCharacter::OnMeleeAttackMontageEnded(UAnimMontage* InMontage, bool bInterruped)
@@ -205,4 +224,11 @@ void ASCharacter::OnCharacterDeath()
 {
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_None);
+
+	ASPlayerController* PlayerController = GetController<ASPlayerController>();
+	if (IsValid(PlayerController) == true && HasAuthority() == true)
+	{
+		UKismetSystemLibrary::PrintString(this, FString::Printf(TEXT("dEATH1")));
+		PlayerController->OnOwningCharacterDead();
+	}
 }

@@ -9,6 +9,7 @@
 #include "Engine/AssetManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/StreamableManager.h"
+#include "Controller/SUIPlayerController.h"
 
 void UUW_LobbyLayout::NativeOnInitialized()
 {
@@ -91,5 +92,10 @@ void UUW_LobbyLayout::OnSubmitButtonClicked()
         FFileHelper::SaveStringToFile(PlayerInfoJsonString, *AbsoluteFilePath);
     }
 
-    UGameplayStatics::OpenLevel(GetWorld(), TEXT("Loading"), true, FString(TEXT("NextLevel=Example")));
+    ASUIPlayerController* PlayerController = GetOwningPlayer<ASUIPlayerController>();
+    if (true == ::IsValid(PlayerController))
+    {
+        FText ServerIP = EditServerIP->GetText();
+        PlayerController->JoinServer(ServerIP.ToString());
+    }
 }

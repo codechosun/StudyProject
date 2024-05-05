@@ -55,4 +55,7 @@ protected:
 
 	uint8 SelectedTeam = 1;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USLobbyLevelUI, Meta = (AllowPrivateAccess, BindWidget))
+	TObjectPtr<UEditableText> EditServerIP;
+
 };

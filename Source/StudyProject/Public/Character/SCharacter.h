@@ -30,6 +30,8 @@ public:
 
 	virtual void SetWidget(UStudyWidget* InStudyWidget) {}
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	UFUNCTION()
 	void OnMeleeAttackMontageEnded(UAnimMontage* InMontage, bool bInterruped);
@@ -48,6 +50,9 @@ protected:
 	UFUNCTION()
 	void OnCharacterDeath();
 
+	UFUNCTION()
+	virtual void OnRep_WeaponInstance() {}
+
 public:
 	static int32 ShowAttackDebug;
 
@@ -55,7 +60,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TSubclassOf<ASWeaponActor> WeaponClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponInstance, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TObjectPtr<ASWeaponActor> WeaponInstance;
 
 	bool bIsNowAttacking = false;
